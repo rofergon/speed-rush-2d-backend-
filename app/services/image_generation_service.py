@@ -3,7 +3,6 @@ import requests
 from io import BytesIO
 from rembg import remove, new_session
 from PIL import Image
-import base64
 
 class ImageGenerationService:
     def __init__(self):
@@ -11,7 +10,7 @@ class ImageGenerationService:
         # Inicializar la sesión de rembg una sola vez
         self.rembg_session = new_session()
 
-    async def generate_car_sprite(self, prompt: str) -> str:
+    async def generate_car_sprite(self, prompt: str) -> bytes:
         try:
             # Generar imagen con OpenAI y obtener la URL
             image_url = await self.openai_service.generate_car_image(prompt)
@@ -31,12 +30,10 @@ class ImageGenerationService:
                 # Optimizar la imagen antes de convertirla
                 output = output.convert('RGBA')
                 
-                # Convertir la imagen procesada a base64
-                buffered = BytesIO()
-                output.save(buffered, format="PNG", optimize=True)
-                img_str = base64.b64encode(buffered.getvalue()).decode()
-                
-                return f"data:image/png;base64,{img_str}"
+                # Convertir la imagen a bytes
+                img_byte_arr = BytesIO()
+                output.save(img_byte_arr, format='PNG', optimize=True)
+                return img_byte_arr.getvalue()
                 
             except requests.exceptions.RequestException as e:
                 print(f"Error descargando la imagen: {e}")

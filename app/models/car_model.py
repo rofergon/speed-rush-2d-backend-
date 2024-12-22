@@ -1,9 +1,12 @@
 from pydantic import BaseModel
+from enum import Enum
+
+class CarStyle(str, Enum):
+    PIXEL_ART = "pixel_art"
+    REALISTIC = "realistic"
+    CARTOON = "cartoon"
+    MINIMALIST = "minimalist"
 
 class CarGenerationRequest(BaseModel):
     prompt: str
-    
-class CarGenerationResponse(BaseModel):
-    success: bool
-    message: str
-    image_url: str | None = None
+    style: CarStyle = CarStyle.CARTOON  # Por defecto será estilo cartoon
