@@ -27,6 +27,8 @@ for key in os.environ:
 # Configuración
 class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    STABILITY_API_KEY: str = os.getenv("STABILITY_API_KEY")
+    
     if not OPENAI_API_KEY:
         raise Exception(
             f"No se encontró OPENAI_API_KEY en las variables de entorno.\n"
@@ -34,6 +36,12 @@ class Settings:
             f"Archivo existe: {ENV_FILE.exists()}\n"
             f"Contenido del directorio:\n"
             f"{[f.name for f in BASE_DIR.iterdir()]}"
+        )
+    
+    if not STABILITY_API_KEY:
+        raise Exception(
+            f"No se encontró STABILITY_API_KEY en las variables de entorno.\n"
+            f"Archivo .env buscado en: {ENV_FILE}"
         )
 
 settings = Settings()
