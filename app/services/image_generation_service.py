@@ -5,6 +5,7 @@ from rembg import remove, new_session
 from PIL import Image
 import os
 import random
+from ..models.car_model import CarTraits
 
 class ImageGenerationService:
     def __init__(self):
@@ -65,6 +66,17 @@ class ImageGenerationService:
             ]
         }
 
+    def _generate_random_traits(self) -> CarTraits:
+        """Genera traits aleatorios para el carro."""
+        return CarTraits(
+            speed=random.randint(1, 10),
+            acceleration=random.randint(1, 10),
+            handling=random.randint(1, 10),
+            drift_factor=random.randint(1, 10),
+            turn_factor=random.randint(1, 10),
+            max_speed=random.randint(1, 10)
+        )
+
     def _get_random_elements(self):
         """Obtiene elementos aleatorios para construir el prompt."""
         return {
@@ -82,7 +94,7 @@ class ImageGenerationService:
             return template.format(**elements)
         return ""
 
-    async def generate_car_sprite(self, prompt: str) -> bytes:
+    async def generate_car_sprite(self, prompt: str) -> tuple[bytes, CarTraits]:
         try:
             # Determinar el estilo basado en el prompt o usar uno aleatorio
             style = None
@@ -118,7 +130,11 @@ class ImageGenerationService:
                 # Convertir la imagen a bytes
                 img_byte_arr = BytesIO()
                 output.save(img_byte_arr, format='PNG', optimize=True)
-                return img_byte_arr.getvalue()
+                
+                # Generar traits aleatorios
+                traits = self._generate_random_traits()
+                
+                return img_byte_arr.getvalue(), traits
                 
             except Exception as e:
                 print(f"Error processing image: {e}")
