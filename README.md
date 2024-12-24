@@ -1,75 +1,197 @@
-# Speed Rush 2D - Car Sprite Generator
+# Speed Rush 2D - Backend API 🏎️
 
-This project is a Python backend that generates top-down 2D car sprites using OpenAI's API.
+AI-powered car sprite generation API for Speed Rush 2D game. This service uses FastAPI, Stability AI, and OpenAI to generate custom car sprites with different styles and characteristics.
 
-## Features
+## 🚀 Features
 
-- Car sprite generation using DALL-E 3
-- Image validation using GPT-4 Vision
+- AI-powered car sprite generation
+- Multiple design styles:
+  - Pixel Art 🎮
+  - Realistic 📸
+  - Cartoon 🎨
+  - Minimalist ⚪
+- Automatic vehicle traits generation
 - Automatic background removal
-- REST API built with FastAPI
+- RESTful API with FastAPI
 
-## Requirements
+## 🛠️ Technologies
 
-- Python 3.8+
+- Python 3.11+
+- FastAPI
+- Stability AI API
+- OpenAI API
+- rembg (for background removal)
+- Railway for deployment
+
+## 📋 Requirements
+
+- Python 3.11 or higher
+- Stability AI API Key
 - OpenAI API Key
+- Internet Connection
 
-## Setup
+## 🔧 Installation
 
-1. Clone the repository
+1. Clone the repository:
+```bash
+git clone https://github.com/your-username/speed-rush-2d-backend.git
+cd speed-rush-2d-backend
+```
+
 2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Create a `.env` file with:
-   ```
-   OPENAI_API_KEY=your_api_key_here
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-## Running the Server
+3. Set up environment variables:
+```bash
+# Create .env file
+cp .env.example .env
 
+# Edit .env and add your API keys
+STABILITY_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_api_key_here
+```
+
+## 🚀 Usage
+
+### Start the server locally:
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The server will be available at `http://localhost:8000`
+### Available Endpoints:
 
-## API Endpoints
+#### Generate Car
+```http
+POST /api/cars/generate
+```
 
-### POST /api/cars/generate
-
-Generates a new car sprite.
-
-Request body:
+Payload:
 ```json
 {
-    "prompt": "red sports car"
+    "prompt": "a red futuristic sports car",
+    "style": "cartoon"
 }
 ```
+
+Available styles:
+- `pixel_art`
+- `realistic`
+- `cartoon`
+- `minimalist`
 
 Response:
 ```json
 {
-    "success": true,
-    "message": "Sprite generated successfully",
-    "image_data": "base64_image_data"
+    "image": {
+        "data": "base64_string",
+        "content_type": "image/png",
+        "filename": "car_sprite.png"
+    },
+    "metadata": {
+        "traits": {
+            "speed": 1-10,
+            "acceleration": 1-10,
+            "handling": 1-10,
+            "drift_factor": 1-10,
+            "turn_factor": 1-10,
+            "max_speed": 1-10
+        }
+    }
 }
 ```
 
-## API Documentation
+#### Health Check
+```http
+GET /health
+```
 
-Interactive API documentation is available at:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+## 📝 Usage Examples
 
-## AWS Deployment
+### TypeScript/React
+```typescript
+const API_URL = "https://speed-rush-2d-backend-production.up.railway.app";
 
-To deploy on AWS:
+enum CarStyle {
+    PIXEL_ART = "pixel_art",
+    REALISTIC = "realistic",
+    CARTOON = "cartoon",
+    MINIMALIST = "minimalist"
+}
 
-1. Create an EC2 instance or ECS service
-2. Configure environment variables
-3. Install dependencies
-4. Run with gunicorn:
-   ```bash
-   gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
-   ```
+const generateCar = async (prompt: string, style: CarStyle) => {
+    const response = await fetch(`${API_URL}/api/cars/generate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            prompt,
+            style
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+    }
+
+    return await response.json();
+};
+```
+
+### Python
+```python
+import requests
+
+API_URL = "https://speed-rush-2d-backend-production.up.railway.app"
+
+def generate_car(prompt: str, style: str = "cartoon"):
+    response = requests.post(
+        f"{API_URL}/api/cars/generate",
+        json={
+            "prompt": prompt,
+            "style": style
+        }
+    )
+    response.raise_for_status()
+    return response.json()
+```
+
+## 🌐 Deployment
+
+The service is deployed on Railway. To deploy your own instance:
+
+1. Create a Railway account
+2. Connect your GitHub repository
+3. Set up environment variables:
+   - `STABILITY_API_KEY`
+   - `OPENAI_API_KEY`
+4. Done! Railway will handle automatic deployments
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome. Please open an issue first to discuss what you would like to change.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## ✨ Credits
+
+- Stability AI for their image generation API
+- OpenAI for their API
+- rembg for the background removal tool
+- Railway for hosting
+
+## 📚 API Documentation
+
+Full API documentation is available at:
+- Swagger UI: `https://speed-rush-2d-backend-production.up.railway.app/docs`
+- ReDoc: `https://speed-rush-2d-backend-production.up.railway.app/redoc`
