@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 import logging
 import sys
 from .routes import car_generation
+import os
+from rembg import new_session
 
 # Configurar logging
 logging.basicConfig(
@@ -12,6 +14,14 @@ logging.basicConfig(
     stream=sys.stdout
 )
 logger = logging.getLogger(__name__)
+
+# Pre-cargar modelo rembg
+logger.info("Pre-cargando modelo rembg...")
+try:
+    rembg_session = new_session()
+    logger.info("Modelo rembg pre-cargado exitosamente")
+except Exception as e:
+    logger.error(f"Error pre-cargando modelo rembg: {str(e)}")
 
 app = FastAPI(
     title="Speed Rush 2D Car Generator",
@@ -38,7 +48,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     logger.info("Health check realizado")
-    return {"status": "healthy"}
+    return {"status": "healthy", "rembg_model": os.path.exists("/root/.u2net/u2net.onnx")}
 
 # Manejador global de excepciones
 @app.exception_handler(Exception)
