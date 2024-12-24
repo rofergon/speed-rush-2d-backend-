@@ -6,11 +6,21 @@ from PIL import Image
 import os
 import random
 from ..models.car_model import CarTraits
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ImageGenerationService:
     def __init__(self):
         self.stability_service = StabilityService()
-        self.rembg_session = new_session()
+        logger.info("Iniciando carga del modelo rembg...")
+        try:
+            self.rembg_session = new_session()
+            logger.info("Modelo rembg cargado exitosamente")
+        except Exception as e:
+            logger.error(f"Error cargando modelo rembg: {str(e)}")
+            self.rembg_session = None
+        
         self.base_image_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "car1-enhanced.png")
         
         # Listas de elementos para generar prompts más detallados
@@ -96,33 +106,21 @@ class ImageGenerationService:
 
     async def generate_car_sprite(self, prompt: str) -> tuple[bytes, CarTraits]:
         try:
-            # Determinar el estilo basado en el prompt o usar uno aleatorio
-            style = None
-            for style_name in self.style_variations.keys():
-                if style_name.lower() in prompt.lower():
-                    style = style_name
-                    break
-            
-            if not style:
-                style = random.choice(list(self.style_variations.keys()))
-            
-            # Obtener una variación aleatoria para el estilo
-            variation = self._get_random_variation(style)
-            
-            # Combinar el prompt original con la variación
-            enhanced_prompt = f"{prompt}. {variation}"
-            print(f"Generating car with enhanced prompt: {enhanced_prompt}")
-            
             # Generar variación del carro base usando Stability AI
-            image_bytes = await self.stability_service.generate_car_variation(self.base_image_path, enhanced_prompt)
-            print("Car variation generated with Stability AI")
+            image_bytes = await self.stability_service.generate_car_variation(self.base_image_path, prompt)
+            logger.info("Car variation generated with Stability AI")
             
             try:
                 # Abrir y verificar la imagen
                 img = Image.open(BytesIO(image_bytes))
                 
+                if self.rembg_session is None:
+                    logger.warning("rembg session no disponible, intentando crear una nueva")
+                    self.rembg_session = new_session()
+                
                 # Remover el fondo usando la sesión pre-cargada
                 output = remove(img, session=self.rembg_session)
+                logger.info("Fondo removido exitosamente")
                 
                 # Optimizar la imagen antes de convertirla
                 output = output.convert('RGBA')
@@ -137,9 +135,9 @@ class ImageGenerationService:
                 return img_byte_arr.getvalue(), traits
                 
             except Exception as e:
-                print(f"Error processing image: {e}")
+                logger.error(f"Error processing image: {e}")
                 raise Exception("Error processing the image")
                 
         except Exception as e:
-            print(f"Detailed error: {repr(e)}")
+            logger.error(f"Detailed error: {repr(e)}")
             raise Exception(f"Error generating image: {str(e)}")
