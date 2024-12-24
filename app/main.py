@@ -5,6 +5,7 @@ import logging
 import sys
 from .routes import car_generation
 import os
+import gc
 from rembg import new_session
 
 # Configurar logging
@@ -15,9 +16,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Pre-cargar modelo rembg
+# Forzar recolección de basura
+gc.collect()
+
+# Pre-cargar modelo rembg con configuración de memoria limitada
 logger.info("Pre-cargando modelo rembg...")
 try:
+    os.environ['ONNXRUNTIME_MEMORY_LIMIT'] = '256'  # Limitar memoria de ONNX a 256MB
     rembg_session = new_session()
     logger.info("Modelo rembg pre-cargado exitosamente")
 except Exception as e:
@@ -48,7 +53,11 @@ async def root():
 @app.get("/health")
 async def health_check():
     logger.info("Health check realizado")
-    return {"status": "healthy", "rembg_model": os.path.exists("/root/.u2net/u2net.onnx")}
+    return {
+        "status": "healthy", 
+        "memory_usage": f"{gc.get_count()} objetos rastreados",
+        "rembg_model": os.path.exists("/root/.u2net/u2net.onnx")
+    }
 
 # Manejador global de excepciones
 @app.exception_handler(Exception)
@@ -58,3 +67,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Error interno del servidor", "error": str(exc)}
     )
+
+# Limpiar memoria periódicamente
+@app.middleware("http")
+async def cleanup_memory(request: Request, call_next):
+    response = await call_next(request)
+    gc.collect()  # Forzar recolección de basura después de cada petición
+    return response
