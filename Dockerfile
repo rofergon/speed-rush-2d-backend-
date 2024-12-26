@@ -8,11 +8,13 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
+ENV PYTHONPATH=/app
 
 # Instalar dependencias del sistema necesarias
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
+    tree \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar los archivos de requerimientos
@@ -21,10 +23,14 @@ COPY requirements.txt .
 # Instalar dependencias de Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar el resto del código
-COPY . .
+# Crear directorios necesarios
+RUN mkdir -p /app/generated_cars /app/assets
 
-# Script de inicio para verificar variables de entorno
+# Copiar el código de la aplicación
+COPY app app/
+COPY assets assets/
+
+# Copiar archivos de configuración
 COPY start.sh .
 RUN chmod +x start.sh
 
