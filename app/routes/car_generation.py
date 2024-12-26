@@ -13,13 +13,13 @@ async def generate_car(request: CarGenerationRequest) -> CarGenerationResponse:
     try:
         logger.info(f"Iniciando generación de carro con prompt: {request.prompt}")
         
-        # Crear configuración del carro
+        # Crear configuración del carro con los parámetros recibidos
         config = CarConfig(
             basePrompt=request.prompt,
             style=request.style,
-            engineType="performance",  # Podríamos hacer esto configurable
-            transmissionType="automatic",
-            wheelsType="racing"
+            engineType=request.engineType,
+            transmissionType=request.transmissionType,
+            wheelsType=request.wheelsType
         )
         
         # Generar assets del carro

@@ -38,33 +38,75 @@ class ImageGenerationService:
         logger.info(f"Usando imagen de referencia: {os.path.basename(selected_image)}")
         return selected_image
 
-    def _calculate_part_stats(self, part_type: PartType, config: CarConfig) -> tuple[int, int, int]:
-        """Calcula las estadísticas para una parte específica."""
-        if part_type == PartType.ENGINE:
+    def _calculate_engine_stats(self, config: CarConfig) -> tuple[int, int, int]:
+        """Calcula las estadísticas del motor."""
+        if config.engineType == "performance":
             return (
-                random.randint(5, 10),  # Potencia
-                random.randint(3, 8),   # Eficiencia
-                random.randint(4, 9)    # Durabilidad
+                random.randint(7, 10),  # Potencia
+                random.randint(5, 8),   # Eficiencia
+                random.randint(6, 9)    # Durabilidad
             )
-        elif part_type == PartType.TRANSMISSION:
+        elif config.engineType == "eco":
             return (
-                random.randint(4, 9),   # Velocidad de cambio
-                random.randint(5, 10),  # Eficiencia de transmisión
-                random.randint(3, 8)    # Control
+                random.randint(4, 7),   # Potencia
+                random.randint(7, 10),  # Eficiencia
+                random.randint(7, 10)   # Durabilidad
             )
-        else:  # WHEELS
+        else:  # standard
             return (
-                random.randint(3, 8),   # Tracción
-                random.randint(4, 9),   # Manejo
-                random.randint(5, 10)   # Agarre
+                random.randint(5, 8),   # Potencia
+                random.randint(5, 8),   # Eficiencia
+                random.randint(5, 8)    # Durabilidad
+            )
+
+    def _calculate_transmission_stats(self, config: CarConfig) -> tuple[int, int, int]:
+        """Calcula las estadísticas de la transmisión."""
+        if config.transmissionType == "automatic":
+            return (
+                random.randint(6, 9),   # Velocidad de cambio
+                random.randint(7, 10),  # Eficiencia
+                random.randint(5, 8)    # Control
+            )
+        elif config.transmissionType == "manual":
+            return (
+                random.randint(7, 10),  # Velocidad de cambio
+                random.randint(5, 8),   # Eficiencia
+                random.randint(7, 10)   # Control
+            )
+        else:  # sequential
+            return (
+                random.randint(8, 10),  # Velocidad de cambio
+                random.randint(6, 9),   # Eficiencia
+                random.randint(6, 9)    # Control
+            )
+
+    def _calculate_wheels_stats(self, config: CarConfig) -> tuple[int, int, int]:
+        """Calcula las estadísticas de las ruedas."""
+        if config.wheelsType == "racing":
+            return (
+                random.randint(7, 10),  # Tracción
+                random.randint(7, 10),  # Manejo
+                random.randint(6, 9)    # Agarre
+            )
+        elif config.wheelsType == "offroad":
+            return (
+                random.randint(8, 10),  # Tracción
+                random.randint(5, 8),   # Manejo
+                random.randint(7, 10)   # Agarre
+            )
+        else:  # standard
+            return (
+                random.randint(5, 8),   # Tracción
+                random.randint(5, 8),   # Manejo
+                random.randint(5, 8)    # Agarre
             )
 
     async def _generate_part_image(self, part_type: PartType, config: CarConfig) -> bytes:
         """Genera la imagen para una parte específica del carro."""
         prompts = {
-            PartType.ENGINE: f"detailed {config.engineType} car engine, {config.style} style",
-            PartType.TRANSMISSION: f"detailed {config.transmissionType} car transmission, {config.style} style",
-            PartType.WHEELS: f"detailed {config.wheelsType} car wheels, {config.style} style"
+            PartType.ENGINE: f"detailed {config.engineType} car engine, {config.style} style, white background",
+            PartType.TRANSMISSION: f"detailed {config.transmissionType} car transmission, {config.style} style, white background",
+            PartType.WHEELS: f"detailed {config.wheelsType} car wheels, {config.style} style, white background"
         }
         
         image_bytes = await self.stability_service.generate_car_variation(
@@ -95,38 +137,43 @@ class ImageGenerationService:
                 self._get_random_base_image(),
                 config.basePrompt
             )
-            images['car'] = car_image
             
-            # Generar imágenes de las partes
+            # Subir imagen principal a Lighthouse
+            car_uri = await self.lighthouse_service.upload_image(car_image, "car.png")
+            
+            # Generar y subir imágenes de las partes
             for part_type in PartType:
+                # Generar imagen de la parte
                 part_image = await self._generate_part_image(part_type, config)
-                images[part_type.name.lower()] = part_image
                 
-                # Calcular stats para la parte
-                stat1, stat2, stat3 = self._calculate_part_stats(part_type, config)
+                # Subir imagen a Lighthouse
+                part_uri = await self.lighthouse_service.upload_image(
+                    part_image,
+                    f"{part_type.name.lower()}.png"
+                )
                 
-                parts_data.append({
-                    'partType': part_type.value,
-                    'stat1': stat1,
-                    'stat2': stat2,
-                    'stat3': stat3
-                })
+                # Calcular estadísticas según el tipo de parte
+                if part_type == PartType.ENGINE:
+                    stat1, stat2, stat3 = self._calculate_engine_stats(config)
+                elif part_type == PartType.TRANSMISSION:
+                    stat1, stat2, stat3 = self._calculate_transmission_stats(config)
+                else:  # WHEELS
+                    stat1, stat2, stat3 = self._calculate_wheels_stats(config)
+                
+                # Agregar datos de la parte
+                parts_data.append(CarPart(
+                    partType=part_type,
+                    stat1=stat1,
+                    stat2=stat2,
+                    stat3=stat3,
+                    imageURI=part_uri
+                ))
             
-            # 2. Subir imágenes a Lighthouse
-            uris = await self.lighthouse_service.upload_multiple_images(images)
-            
-            # 3. Construir respuesta final
-            response = {
-                'carImageURI': uris['carURI'],
-                'parts': []
+            # Construir respuesta final
+            return {
+                'carImageURI': car_uri,
+                'parts': parts_data
             }
-            
-            # Agregar URIs a las partes
-            for part_data, part_type in zip(parts_data, PartType):
-                part_data['imageURI'] = uris[f"{part_type.name.lower()}URI"]
-                response['parts'].append(CarPart(**part_data))
-            
-            return response
             
         except Exception as e:
             logger.error(f"Error generating car assets: {repr(e)}")
