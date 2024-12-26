@@ -191,7 +191,7 @@ class ImageGenerationService:
             ))
             
             # Transmisión - prompt específico para transmisión
-            transmission_prompt = f"detailed {config.transmissionType} car transmission system, {base_colors}, technical diagram style, gearbox visible, gear mechanisms, drive shaft, clutch system, {config.style} style, centered on pure white background"
+            transmission_prompt = f"detailed automotive {config.transmissionType} transmission gearbox mechanism, {base_colors}, technical diagram style, car transmission parts visible, automotive gearbox, mechanical transmission system, drivetrain components, vehicle transmission, {config.style} style, centered on pure white background"
             tasks.append(self.stability_service.generate_car_variation(
                 transmission_ref,
                 transmission_prompt,
@@ -199,7 +199,7 @@ class ImageGenerationService:
             ))
             
             # Ruedas - prompt específico para ruedas
-            wheels_prompt = f"detailed {config.wheelsType} car wheel and tire, {base_colors}, performance design, rim details, tire tread pattern, brake system visible, {config.style} style, centered on pure white background"
+            wheels_prompt = f"detailed automotive {config.wheelsType} car wheel and tire assembly, {base_colors}, automotive wheel design, car rim details, vehicle tire tread pattern, automotive brake system, car wheel components, vehicle wheel, {config.style} style, centered on pure white background"
             tasks.append(self.stability_service.generate_car_variation(
                 wheels_ref,
                 wheels_prompt,
