@@ -10,11 +10,16 @@ from rembg import new_session
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Cambiar a DEBUG para más información
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     stream=sys.stdout
 )
 logger = logging.getLogger(__name__)
+
+# Registrar información del entorno
+logger.info(f"Iniciando aplicación en el entorno: {os.getenv('RAILWAY_ENVIRONMENT', 'local')}")
+logger.info(f"Puerto configurado: {os.getenv('PORT', '8080')}")
+logger.info(f"Python path: {os.getenv('PYTHONPATH')}")
 
 try:
     # Forzar recolección de basura
@@ -58,7 +63,9 @@ async def root():
         "message": "Bienvenido a Speed Rush 2D Car Generator API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "environment": os.getenv("RAILWAY_ENVIRONMENT", "local"),
+        "port": os.getenv("PORT", "8080")
     }
 
 @app.get("/health")
@@ -68,6 +75,7 @@ async def health_check():
         from .config import settings
         config_status = "OK"
     except Exception as e:
+        logger.error(f"Error en configuración: {str(e)}")
         config_status = f"Error: {str(e)}"
 
     health_info = {
@@ -75,7 +83,8 @@ async def health_check():
         "config_status": config_status,
         "memory_usage": f"{gc.get_count()} objetos rastreados",
         "rembg_model": "Cargado" if rembg_session else "No cargado",
-        "environment": os.getenv("RAILWAY_ENVIRONMENT_NAME", "local")
+        "environment": os.getenv("RAILWAY_ENVIRONMENT_NAME", "local"),
+        "port": os.getenv("PORT", "8080")
     }
     
     logger.info(f"Health check realizado: {health_info}")
@@ -94,7 +103,8 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": "Error interno del servidor",
             "error": str(exc),
             "path": request.url.path,
-            "method": request.method
+            "method": request.method,
+            "environment": os.getenv("RAILWAY_ENVIRONMENT", "local")
         }
     )
 
@@ -102,6 +112,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.middleware("http")
 async def cleanup_memory(request: Request, call_next):
     """Middleware para limpiar la memoria después de cada petición."""
-    response = await call_next(request)
-    gc.collect()
-    return response
+    try:
+        response = await call_next(request)
+        gc.collect()
+        return response
+    except Exception as e:
+        logger.error(f"Error en middleware: {str(e)}", exc_info=True)
+        raise

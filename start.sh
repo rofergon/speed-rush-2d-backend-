@@ -25,6 +25,7 @@ echo "Verificando variables de entorno..."
 check_env_var "OPENAI_API_KEY"
 check_env_var "STABILITY_API_KEY"
 check_env_var "LIGHTHOUSE_API_KEY"
+check_env_var "PORT"
 
 echo "Todas las variables de entorno requeridas están configuradas"
 
@@ -38,6 +39,13 @@ python3 --version
 echo "Verificando módulos instalados:"
 pip list
 
+# Verificar puerto
+echo "Puerto configurado: ${PORT}"
+if [ -z "${PORT}" ]; then
+    echo "Puerto no configurado, usando 8080 por defecto"
+    PORT=8080
+fi
+
 # Iniciar la aplicación
-echo "Iniciando aplicación..."
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --log-level debug 
+echo "Iniciando aplicación en puerto ${PORT}..."
+exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --log-level debug --timeout-keep-alive 75 
