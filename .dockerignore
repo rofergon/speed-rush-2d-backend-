@@ -8,7 +8,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -20,6 +19,7 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -27,6 +27,8 @@ var/
 # Virtual Environment
 venv/
 ENV/
+env/
+.env
 
 # IDE
 .idea/
@@ -34,9 +36,11 @@ ENV/
 *.swp
 *.swo
 
-# Logs
+# Archivos generados
+generated_cars/
 *.log
+*.sqlite3
 
-# Local development
-.env
-.env.local 
+# Otros
+.DS_Store
+Thumbs.db 
