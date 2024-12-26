@@ -11,6 +11,8 @@ import logging
 import glob
 import asyncio
 from typing import Dict, List, Tuple
+from openai import OpenAI
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,7 @@ class ImageGenerationService:
     def __init__(self):
         self.stability_service = StabilityService()
         self.lighthouse_service = LighthouseService()
+        self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
         logger.info("Iniciando carga del modelo rembg...")
         try:
             self.rembg_session = new_session()
@@ -32,9 +35,9 @@ class ImageGenerationService:
         # Cargar imágenes de referencia por tipo
         self.reference_images = {
             'car': self._load_references('*.png'),
-            'motor': self._load_references('motor/*.webp'),
-            'transmission': self._load_references('transmission/*.webp'),
-            'wheels': self._load_references('wheels/*.webp')
+            'motor': self._load_references('motor/*.{png,jpg,jpeg,webp}'),
+            'transmission': self._load_references('transmission/*.{png,jpg,jpeg,webp}'),
+            'wheels': self._load_references('wheels/*.{png,jpg,jpeg,webp}')
         }
         
         logger.info(f"Imágenes de referencia encontradas:")
@@ -44,7 +47,17 @@ class ImageGenerationService:
     def _load_references(self, pattern: str) -> List[str]:
         """Cargar imágenes de referencia según un patrón."""
         path = os.path.join(self.base_dir, pattern)
-        images = glob.glob(path)
+        # Usar glob.glob con múltiples patrones
+        if '{' in pattern:
+            # Si el patrón tiene llaves, expandir para cada extensión
+            images = []
+            for ext in ['png', 'jpg', 'jpeg', 'webp']:
+                expanded_path = path.replace('{png,jpg,jpeg,webp}', ext)
+                images.extend(glob.glob(expanded_path))
+        else:
+            # Si es un patrón simple, usarlo directamente
+            images = glob.glob(path)
+            
         if not images:
             logger.warning(f"No se encontraron imágenes para el patrón: {pattern}")
         return images
@@ -95,47 +108,150 @@ class ImageGenerationService:
             logger.error(f"Error generando {part_type}: {str(e)}")
             raise
 
+    async def _generate_creative_prompt(self) -> tuple[str, str]:
+        """Genera un prompt creativo para el carro usando generación local."""
+        try:
+            # Listas de elementos para generar descripciones
+            colors = ["rojo", "azul", "verde", "negro", "blanco", "amarillo", "plateado", "dorado", "naranja", "púrpura"]
+            styles = ["futurista", "clásico", "moderno", "retro", "elegante", "agresivo", "deportivo", "luxury"]
+            details = ["con detalles cromados", "con líneas aerodinámicas", "con alerones deportivos", "con diseño minimalista"]
+            features = [
+                "con faros LED integrados",
+                "con tomas de aire laterales",
+                "con parrilla frontal distintiva",
+                "con perfil bajo y estilizado",
+                "con curvas suaves y elegantes",
+                "con diseño angular y agresivo",
+                "con acabados metálicos premium",
+                "con líneas deportivas fluidas"
+            ]
+            
+            # Generar descripción aleatoria más detallada
+            selected_color = random.choice(colors)
+            selected_style = random.choice(styles)
+            selected_details = random.choice(details)
+            selected_features = random.choice(features)
+            
+            creative_prompt = f"carro {selected_style} {selected_color} {selected_details} {selected_features}"
+            
+            # Mapear colores a inglés para las partes
+            color_mapping = {
+                "rojo": "red colored, crimson accents",
+                "azul": "blue colored, metallic blue accents",
+                "verde": "green colored, emerald accents",
+                "negro": "black colored, dark chrome accents",
+                "blanco": "white colored, pearl accents",
+                "amarillo": "yellow colored, gold accents",
+                "plateado": "silver colored, chrome accents",
+                "dorado": "gold colored, bronze accents",
+                "naranja": "orange colored, copper accents",
+                "púrpura": "purple colored, metallic accents"
+            }
+            
+            color_base = color_mapping.get(selected_color, "metallic colored, chrome accents")
+            
+            logger.info(f"Prompt generado: {creative_prompt}")
+            return creative_prompt, color_base
+            
+        except Exception as e:
+            logger.error(f"Error generando prompt creativo: {str(e)}")
+            return "modern sports car with aerodynamic design", "metallic colored, chrome accents"
+
     async def generate_car_assets(self, config: CarConfig) -> dict:
         """Genera todos los assets del carro y sus estadísticas."""
         try:
-            # Preparar tareas de generación
-            tasks = [
-                # Carro principal
-                self._generate_and_upload(
-                    'car',
-                    config.basePrompt,
-                    'car'
-                ),
-                # Motor
-                self._generate_and_upload(
-                    'engine',
-                    f"detailed {config.engineType} car engine, {config.style} style, white background",
-                    'motor'
-                ),
-                # Transmisión
-                self._generate_and_upload(
-                    'transmission',
-                    f"detailed {config.transmissionType} car transmission, {config.style} style, white background",
-                    'transmission'
-                ),
-                # Ruedas
-                self._generate_and_upload(
-                    'wheels',
-                    f"detailed {config.wheelsType} car wheels, {config.style} style, white background",
-                    'wheels'
-                )
-            ]
+            logger.info("Iniciando generación paralela de imágenes...")
+            
+            # Generar prompt creativo
+            creative_prompt, base_colors = await self._generate_creative_prompt()
+            
+            # Preparar todas las referencias y prompts primero
+            car_ref = self._get_random_reference('car')
+            engine_ref = self._get_random_reference('motor')
+            transmission_ref = self._get_random_reference('transmission')
+            wheels_ref = self._get_random_reference('wheels')
+            
+            # Crear todas las tareas de generación al mismo tiempo
+            tasks = []
+            
+            # Carro principal - usar el prompt creativo
+            car_prompt = f"{creative_prompt}, perfect top-down view, centered, high quality, detailed design"
+            tasks.append(self.stability_service.generate_car_variation(
+                car_ref,
+                car_prompt,
+                config.style
+            ))
+            
+            # Motor - prompt específico para motor
+            engine_prompt = f"detailed {config.engineType} car engine, {base_colors}, technical diagram style, mechanical parts visible, pistons, cylinders, valves, highly detailed engine block, {config.style} style, centered on pure white background"
+            tasks.append(self.stability_service.generate_car_variation(
+                engine_ref,
+                engine_prompt,
+                config.style
+            ))
+            
+            # Transmisión - prompt específico para transmisión
+            transmission_prompt = f"detailed {config.transmissionType} car transmission system, {base_colors}, technical diagram style, gearbox visible, gear mechanisms, drive shaft, clutch system, {config.style} style, centered on pure white background"
+            tasks.append(self.stability_service.generate_car_variation(
+                transmission_ref,
+                transmission_prompt,
+                config.style
+            ))
+            
+            # Ruedas - prompt específico para ruedas
+            wheels_prompt = f"detailed {config.wheelsType} car wheel and tire, {base_colors}, performance design, rim details, tire tread pattern, brake system visible, {config.style} style, centered on pure white background"
+            tasks.append(self.stability_service.generate_car_variation(
+                wheels_ref,
+                wheels_prompt,
+                config.style
+            ))
             
             # Ejecutar todas las generaciones en paralelo
-            logger.info("Iniciando generación paralela de imágenes...")
-            results = await asyncio.gather(*tasks)
+            logger.info("Ejecutando generación de imágenes en paralelo...")
+            logger.info(f"Prompts utilizados:")
+            logger.info(f"Carro: {car_prompt}")
+            logger.info(f"Motor: {engine_prompt}")
+            logger.info(f"Transmisión: {transmission_prompt}")
+            logger.info(f"Ruedas: {wheels_prompt}")
+            
+            image_results = await asyncio.gather(*tasks)
             logger.info("Generación de imágenes completada")
             
+            # Procesar y subir las imágenes generadas
+            upload_tasks = []
+            for idx, (part_type, image_bytes) in enumerate([
+                ('car', image_results[0]),
+                ('engine', image_results[1]),
+                ('transmission', image_results[2]),
+                ('wheels', image_results[3])
+            ]):
+                # Remover fondo
+                img = Image.open(BytesIO(image_bytes))
+                if self.rembg_session is None:
+                    self.rembg_session = new_session()
+                output = remove(img, session=self.rembg_session)
+                
+                # Convertir a bytes
+                img_byte_arr = BytesIO()
+                output.save(img_byte_arr, format='PNG', optimize=True)
+                processed_bytes = img_byte_arr.getvalue()
+                
+                # Agregar tarea de subida
+                upload_tasks.append(self.lighthouse_service.upload_image(
+                    processed_bytes,
+                    f"{part_type}.png"
+                ))
+            
+            # Subir todas las imágenes en paralelo
+            logger.info("Subiendo imágenes en paralelo...")
+            uris = await asyncio.gather(*upload_tasks)
+            logger.info("Subida de imágenes completada")
+            
             # Extraer URIs
-            _, car_uri = results[0]
-            _, engine_uri = results[1]
-            _, transmission_uri = results[2]
-            _, wheels_uri = results[3]
+            car_uri = uris[0]
+            engine_uri = uris[1]
+            transmission_uri = uris[2]
+            wheels_uri = uris[3]
             
             # Generar estadísticas
             parts_data = []

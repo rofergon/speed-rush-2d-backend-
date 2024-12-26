@@ -13,10 +13,10 @@ class StabilityService:
         self.api_key = settings.STABILITY_API_KEY
         self.api_host = "https://api.stability.ai/v2beta/stable-image/control/structure"
         self.style_prompts = {
-            CarStyle.PIXEL_ART: "A sports car in top-down 2D view, pixel art style, vibrant colors, white background",
-            CarStyle.REALISTIC: "A sports car in top-down 2D view, photorealistic style, modern and aerodynamic design, white background",
-            CarStyle.CARTOON: "A sports car in top-down 2D view, modern cartoon style, clean design, white background",
-            CarStyle.MINIMALIST: "A sports car in top-down 2D view, minimalist style, simple lines, elegant design, white background"
+            CarStyle.PIXEL_ART: "A detailed sports car in perfect top-down 2D view, pixel art style, vibrant colors, clean design, high contrast, sharp edges, colorful details, on pure white background, game asset style",
+            CarStyle.REALISTIC: "A detailed sports car in perfect top-down 2D view, photorealistic style, modern and aerodynamic design, metallic paint, reflective surfaces, high detail, sharp focus, on pure white background",
+            CarStyle.CARTOON: "A detailed sports car in perfect top-down 2D view, modern cartoon style, clean vector-like design, bold colors, smooth shading, distinctive outlines, on pure white background",
+            CarStyle.MINIMALIST: "A detailed sports car in perfect top-down 2D view, minimalist style, clean simple lines, elegant geometric shapes, essential details only, modern design language, on pure white background"
         }
 
     def _resize_image(self, image_path: str) -> str:
@@ -90,9 +90,9 @@ class StabilityService:
                 "image": temp_image_path,
                 "control_strength": "0.7",
                 "prompt": full_prompt,
-                "negative_prompt": "low quality, distorted, bad proportions, blurry, pixelated",
+                "negative_prompt": "low quality, distorted, bad proportions, blurry, pixelated, side view, perspective view, angled view, 3d view, text, watermark, signature, cropped, out of frame",
                 "seed": "0",
-                "steps": "30",
+                "steps": "40",
                 "output_format": "png"
             }
             
