@@ -88,7 +88,7 @@ class StabilityService:
             # Preparar los parámetros siguiendo el formato del ejemplo
             params = {
                 "image": temp_image_path,
-                "control_strength": "0.7",
+                "control_strength": "0.65",
                 "prompt": full_prompt,
                 "negative_prompt": "low quality, distorted, bad proportions, blurry, pixelated, side view, perspective view, angled view, 3d view, text, watermark, signature, cropped, out of frame",
                 "seed": "0",

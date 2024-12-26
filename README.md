@@ -1,10 +1,14 @@
 # Speed Rush 2D - Backend API 🏎️
 
-AI-powered car sprite generation API for Speed Rush 2D game. This service uses FastAPI, Stability AI, and OpenAI to generate custom car sprites with different styles and characteristics.
+AI-powered car sprite generation API for Speed Rush 2D game. This service uses FastAPI and Stability AI to generate custom car sprites and their components with different styles and characteristics.
 
 ## 🚀 Features
 
-- AI-powered car sprite generation
+- AI-powered sprite generation for:
+  - Complete car designs 🚗
+  - Engine components 🔧
+  - Transmission systems ⚙️
+  - Wheel sets 🛞
 - Multiple design styles:
   - Pixel Art 🎮
   - Realistic 📸
@@ -13,13 +17,14 @@ AI-powered car sprite generation API for Speed Rush 2D game. This service uses F
 - Automatic vehicle traits generation
 - Automatic background removal
 - RESTful API with FastAPI
+- Parallel image generation
+- Consistent color schemes across components
 
 ## 🛠️ Technologies
 
 - Python 3.11+
 - FastAPI
 - Stability AI API
-- OpenAI API
 - rembg (for background removal)
 - Railway for deployment
 
@@ -27,7 +32,6 @@ AI-powered car sprite generation API for Speed Rush 2D game. This service uses F
 
 - Python 3.11 or higher
 - Stability AI API Key
-- OpenAI API Key
 - Internet Connection
 
 ## 🔧 Installation
@@ -48,21 +52,20 @@ pip install -r requirements.txt
 # Create .env file
 cp .env.example .env
 
-# Edit .env and add your API keys
+# Edit .env and add your API key
 STABILITY_API_KEY=your_api_key_here
-OPENAI_API_KEY=your_api_key_here
 ```
 
 ## 🚀 Usage
 
 ### Start the server locally:
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8080
 ```
 
 ### Available Endpoints:
 
-#### Generate Car
+#### Generate Car and Components
 ```http
 POST /api/cars/generate
 ```
@@ -70,35 +73,47 @@ POST /api/cars/generate
 Payload:
 ```json
 {
-    "prompt": "a red futuristic sports car",
-    "style": "cartoon"
+    "prompt": "string",
+    "style": "cartoon",
+    "engineType": "standard",
+    "transmissionType": "manual",
+    "wheelsType": "sport"
 }
 ```
 
-Available styles:
-- `pixel_art`
-- `realistic`
-- `cartoon`
-- `minimalist`
+Available parameters:
+- `style`: pixel_art, realistic, cartoon, minimalist
+- `engineType`: standard, performance, eco
+- `transmissionType`: manual, automatic, sequential
+- `wheelsType`: sport, racing, offroad
 
 Response:
 ```json
 {
-    "image": {
-        "data": "base64_string",
-        "content_type": "image/png",
-        "filename": "car_sprite.png"
-    },
-    "metadata": {
-        "traits": {
-            "speed": 1-10,
-            "acceleration": 1-10,
-            "handling": 1-10,
-            "drift_factor": 1-10,
-            "turn_factor": 1-10,
-            "max_speed": 1-10
+    "carImageURI": "https://gateway.lighthouse.storage/ipfs/...",
+    "parts": [
+        {
+            "partType": "ENGINE",
+            "stat1": 7,
+            "stat2": 6,
+            "stat3": 8,
+            "imageURI": "https://gateway.lighthouse.storage/ipfs/..."
+        },
+        {
+            "partType": "TRANSMISSION",
+            "stat1": 8,
+            "stat2": 7,
+            "stat3": 9,
+            "imageURI": "https://gateway.lighthouse.storage/ipfs/..."
+        },
+        {
+            "partType": "WHEELS",
+            "stat1": 6,
+            "stat2": 8,
+            "stat3": 7,
+            "imageURI": "https://gateway.lighthouse.storage/ipfs/..."
         }
-    }
+    ]
 }
 ```
 
@@ -109,9 +124,33 @@ GET /health
 
 ## 📝 Usage Examples
 
+### Python
+```python
+import requests
+
+API_URL = "http://localhost:8080"
+
+def generate_car(style: str = "cartoon", 
+                engine_type: str = "standard",
+                transmission_type: str = "manual",
+                wheels_type: str = "sport"):
+    response = requests.post(
+        f"{API_URL}/api/cars/generate",
+        json={
+            "prompt": "string",
+            "style": style,
+            "engineType": engine_type,
+            "transmissionType": transmission_type,
+            "wheelsType": wheels_type
+        }
+    )
+    response.raise_for_status()
+    return response.json()
+```
+
 ### TypeScript/React
 ```typescript
-const API_URL = "https://speed-rush-2d-backend-production.up.railway.app";
+const API_URL = "http://localhost:8080";
 
 enum CarStyle {
     PIXEL_ART = "pixel_art",
@@ -120,16 +159,21 @@ enum CarStyle {
     MINIMALIST = "minimalist"
 }
 
-const generateCar = async (prompt: string, style: CarStyle) => {
+interface GenerateCarRequest {
+    prompt: string;
+    style: CarStyle;
+    engineType: "standard" | "performance" | "eco";
+    transmissionType: "manual" | "automatic" | "sequential";
+    wheelsType: "sport" | "racing" | "offroad";
+}
+
+const generateCar = async (params: GenerateCarRequest) => {
     const response = await fetch(`${API_URL}/api/cars/generate`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            prompt,
-            style
-        })
+        body: JSON.stringify(params)
     });
 
     if (!response.ok) {
@@ -140,58 +184,39 @@ const generateCar = async (prompt: string, style: CarStyle) => {
 };
 ```
 
-### Python
-```python
-import requests
+## 🎨 Image Generation Details
 
-API_URL = "https://speed-rush-2d-backend-production.up.railway.app"
+The system generates images using Stability AI's API with the following characteristics:
 
-def generate_car(prompt: str, style: str = "cartoon"):
-    response = requests.post(
-        f"{API_URL}/api/cars/generate",
-        json={
-            "prompt": prompt,
-            "style": style
-        }
-    )
-    response.raise_for_status()
-    return response.json()
-```
+- Each component (car, engine, transmission, wheels) uses specific reference images
+- Control strength of 0.65 for balanced creativity and structure
+- 40 generation steps for high quality
+- Automatic background removal
+- Consistent color schemes across all components
+- Style-specific prompts for each component type
 
 ## 🌐 Deployment
 
-The service is deployed on Railway. To deploy your own instance:
+The service can be deployed on Railway:
 
 1. Create a Railway account
 2. Connect your GitHub repository
-3. Set up environment variables:
+3. Set up environment variable:
    - `STABILITY_API_KEY`
-   - `OPENAI_API_KEY`
 4. Done! Railway will handle automatic deployments
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🤝 Contributing
-
-Contributions are welcome. Please open an issue first to discuss what you would like to change.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
 ## ✨ Credits
 
 - Stability AI for their image generation API
-- OpenAI for their API
 - rembg for the background removal tool
 - Railway for hosting
 
 ## 📚 API Documentation
 
 Full API documentation is available at:
-- Swagger UI: `https://speed-rush-2d-backend-production.up.railway.app/docs`
-- ReDoc: `https://speed-rush-2d-backend-production.up.railway.app/redoc`
+- Swagger UI: `http://localhost:8080/docs`
+- ReDoc: `http://localhost:8080/redoc`
