@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
+from typing import List
 
 class CarStyle(str, Enum):
     PIXEL_ART = "pixel_art"
@@ -7,18 +8,29 @@ class CarStyle(str, Enum):
     CARTOON = "cartoon"
     MINIMALIST = "minimalist"
 
-class CarTraits(BaseModel):
-    speed: int  # 1-10
-    acceleration: int  # 1-10
-    handling: int  # 1-10
-    drift_factor: int  # 1-10
-    turn_factor: int  # 1-10
-    max_speed: int  # 1-10
+class PartType(int, Enum):
+    ENGINE = 0
+    TRANSMISSION = 1
+    WHEELS = 2
+
+class CarPart(BaseModel):
+    partType: PartType
+    stat1: int = Field(..., ge=1, le=10)
+    stat2: int = Field(..., ge=1, le=10)
+    stat3: int = Field(..., ge=1, le=10)
+    imageURI: str
 
 class CarGenerationRequest(BaseModel):
     prompt: str
-    style: CarStyle = CarStyle.CARTOON  # Por defecto será estilo cartoon
+    style: CarStyle = CarStyle.CARTOON
 
 class CarGenerationResponse(BaseModel):
-    image_data: bytes
-    traits: CarTraits
+    carImageURI: str
+    parts: List[CarPart]
+
+class CarConfig(BaseModel):
+    engineType: str = "standard"
+    transmissionType: str = "manual"
+    wheelsType: str = "sport"
+    style: CarStyle = CarStyle.CARTOON
+    basePrompt: str

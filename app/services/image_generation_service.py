@@ -1,18 +1,21 @@
 from .stability_service import StabilityService
+from .lighthouse_service import LighthouseService
 import requests
 from io import BytesIO
 from rembg import remove, new_session
 from PIL import Image
 import os
 import random
-from ..models.car_model import CarTraits
+from ..models.car_model import CarPart, PartType, CarConfig
 import logging
+import glob
 
 logger = logging.getLogger(__name__)
 
 class ImageGenerationService:
     def __init__(self):
         self.stability_service = StabilityService()
+        self.lighthouse_service = LighthouseService()
         logger.info("Iniciando carga del modelo rembg...")
         try:
             self.rembg_session = new_session()
@@ -21,123 +24,110 @@ class ImageGenerationService:
             logger.error(f"Error cargando modelo rembg: {str(e)}")
             self.rembg_session = None
         
-        self.base_image_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "car1-enhanced.png")
-        
-        # Listas de elementos para generar prompts más detallados
-        self.colors = [
-            "metallic red", "pearl white", "electric blue", "racing yellow", 
-            "midnight black", "british racing green", "candy orange",
-            "chrome silver", "matte black", "neon purple", "carbon black",
-            "ferrari red", "lamborghini yellow", "porsche silver"
-        ]
-        
-        self.car_brands = [
-            "Ferrari", "Lamborghini", "Porsche", "McLaren", "Bugatti",
-            "Aston Martin", "Koenigsegg", "Pagani", "Maserati", "BMW M",
-            "Mercedes-AMG", "Audi Sport"
-        ]
-        
-        self.car_features = [
-            "carbon fiber hood", "wide body kit", "rear spoiler",
-            "side skirts", "LED headlights", "custom rims",
-            "dual exhaust", "tinted windows", "hood scoop",
-            "diffuser", "front splitter", "air intakes"
-        ]
-        
-        # Diccionario de variaciones de prompts por estilo
-        self.style_variations = {
-            'PIXEL_ART': [
-                "inspired by OutRun arcade game, {color}, {feature}",
-                "retro racing game style, {brand} inspired, {color} with neon accents",
-                "8-bit racing classic, {color}, {feature}, synthwave style",
-                "pixel perfect {brand} racer, {color}, {feature}",
-                "classic arcade racer, {color} with {feature}, retro gaming vibes"
-            ],
-            'REALISTIC': [
-                "hyperrealistic {brand} supercar, {color}, with {feature}",
-                "photorealistic {color} sports car, {brand} inspired design, {feature}",
-                "ultra-detailed {brand} style racer, {color}, featuring {feature}",
-                "professional racing car, {color} {brand} design, with {feature}",
-                "{brand} track car, {color} finish, aggressive {feature}"
-            ],
-            'CARTOON': [
-                "animated {brand} style racer, {color}, fun {feature}",
-                "playful {color} sports car, {brand} inspired, with exaggerated {feature}",
-                "cartoon {brand} supercar, {color}, stylized {feature}",
-                "whimsical racing car, {color} {brand} design, with cute {feature}",
-                "animated movie style {brand}, {color}, with dynamic {feature}"
-            ],
-            'MINIMALIST': [
-                "clean {brand} design, {color}, subtle {feature}",
-                "elegant {color} sports car, {brand} inspired lines, minimal {feature}",
-                "simplified {brand} silhouette, {color}, essential {feature}",
-                "pure {color} design, {brand} DNA, refined {feature}",
-                "geometric {brand} interpretation, {color}, with streamlined {feature}"
-            ]
-        }
+        # Obtener todas las imágenes de referencia
+        self.base_images_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
+        self.base_images = [f for f in glob.glob(os.path.join(self.base_images_dir, "*.png")) 
+                          if os.path.basename(f).startswith("car")]
+        if not self.base_images:
+            raise Exception("No se encontraron imágenes de referencia en assets/")
+        logger.info(f"Imágenes de referencia encontradas: {len(self.base_images)}")
 
-    def _generate_random_traits(self) -> CarTraits:
-        """Genera traits aleatorios para el carro."""
-        return CarTraits(
-            speed=random.randint(1, 10),
-            acceleration=random.randint(1, 10),
-            handling=random.randint(1, 10),
-            drift_factor=random.randint(1, 10),
-            turn_factor=random.randint(1, 10),
-            max_speed=random.randint(1, 10)
+    def _get_random_base_image(self) -> str:
+        """Selecciona una imagen de referencia aleatoria."""
+        selected_image = random.choice(self.base_images)
+        logger.info(f"Usando imagen de referencia: {os.path.basename(selected_image)}")
+        return selected_image
+
+    def _calculate_part_stats(self, part_type: PartType, config: CarConfig) -> tuple[int, int, int]:
+        """Calcula las estadísticas para una parte específica."""
+        if part_type == PartType.ENGINE:
+            return (
+                random.randint(5, 10),  # Potencia
+                random.randint(3, 8),   # Eficiencia
+                random.randint(4, 9)    # Durabilidad
+            )
+        elif part_type == PartType.TRANSMISSION:
+            return (
+                random.randint(4, 9),   # Velocidad de cambio
+                random.randint(5, 10),  # Eficiencia de transmisión
+                random.randint(3, 8)    # Control
+            )
+        else:  # WHEELS
+            return (
+                random.randint(3, 8),   # Tracción
+                random.randint(4, 9),   # Manejo
+                random.randint(5, 10)   # Agarre
+            )
+
+    async def _generate_part_image(self, part_type: PartType, config: CarConfig) -> bytes:
+        """Genera la imagen para una parte específica del carro."""
+        prompts = {
+            PartType.ENGINE: f"detailed {config.engineType} car engine, {config.style} style",
+            PartType.TRANSMISSION: f"detailed {config.transmissionType} car transmission, {config.style} style",
+            PartType.WHEELS: f"detailed {config.wheelsType} car wheels, {config.style} style"
+        }
+        
+        image_bytes = await self.stability_service.generate_car_variation(
+            self._get_random_base_image(),
+            prompts[part_type]
         )
+        
+        # Remover fondo
+        img = Image.open(BytesIO(image_bytes))
+        if self.rembg_session is None:
+            self.rembg_session = new_session()
+        output = remove(img, session=self.rembg_session)
+        
+        # Convertir a bytes
+        img_byte_arr = BytesIO()
+        output.save(img_byte_arr, format='PNG', optimize=True)
+        return img_byte_arr.getvalue()
 
-    def _get_random_elements(self):
-        """Obtiene elementos aleatorios para construir el prompt."""
-        return {
-            'color': random.choice(self.colors),
-            'brand': random.choice(self.car_brands),
-            'feature': random.choice(self.car_features)
-        }
-
-    def _get_random_variation(self, style: str) -> str:
-        """Obtiene una variación aleatoria del prompt para un estilo específico."""
-        variations = self.style_variations.get(style, [])
-        if variations:
-            template = random.choice(variations)
-            elements = self._get_random_elements()
-            return template.format(**elements)
-        return ""
-
-    async def generate_car_sprite(self, prompt: str) -> tuple[bytes, CarTraits]:
+    async def generate_car_assets(self, config: CarConfig) -> dict:
+        """Genera todos los assets del carro y sus estadísticas."""
         try:
-            # Generar variación del carro base usando Stability AI
-            image_bytes = await self.stability_service.generate_car_variation(self.base_image_path, prompt)
-            logger.info("Car variation generated with Stability AI")
+            # 1. Generar imágenes de las partes
+            images = {}
+            parts_data = []
             
-            try:
-                # Abrir y verificar la imagen
-                img = Image.open(BytesIO(image_bytes))
+            # Generar imagen principal del carro
+            car_image = await self.stability_service.generate_car_variation(
+                self._get_random_base_image(),
+                config.basePrompt
+            )
+            images['car'] = car_image
+            
+            # Generar imágenes de las partes
+            for part_type in PartType:
+                part_image = await self._generate_part_image(part_type, config)
+                images[part_type.name.lower()] = part_image
                 
-                if self.rembg_session is None:
-                    logger.warning("rembg session no disponible, intentando crear una nueva")
-                    self.rembg_session = new_session()
+                # Calcular stats para la parte
+                stat1, stat2, stat3 = self._calculate_part_stats(part_type, config)
                 
-                # Remover el fondo usando la sesión pre-cargada
-                output = remove(img, session=self.rembg_session)
-                logger.info("Fondo removido exitosamente")
-                
-                # Optimizar la imagen antes de convertirla
-                output = output.convert('RGBA')
-                
-                # Convertir la imagen a bytes
-                img_byte_arr = BytesIO()
-                output.save(img_byte_arr, format='PNG', optimize=True)
-                
-                # Generar traits aleatorios
-                traits = self._generate_random_traits()
-                
-                return img_byte_arr.getvalue(), traits
-                
-            except Exception as e:
-                logger.error(f"Error processing image: {e}")
-                raise Exception("Error processing the image")
-                
+                parts_data.append({
+                    'partType': part_type.value,
+                    'stat1': stat1,
+                    'stat2': stat2,
+                    'stat3': stat3
+                })
+            
+            # 2. Subir imágenes a Lighthouse
+            uris = await self.lighthouse_service.upload_multiple_images(images)
+            
+            # 3. Construir respuesta final
+            response = {
+                'carImageURI': uris['carURI'],
+                'parts': []
+            }
+            
+            # Agregar URIs a las partes
+            for part_data, part_type in zip(parts_data, PartType):
+                part_data['imageURI'] = uris[f"{part_type.name.lower()}URI"]
+                response['parts'].append(CarPart(**part_data))
+            
+            return response
+            
         except Exception as e:
-            logger.error(f"Detailed error: {repr(e)}")
-            raise Exception(f"Error generating image: {str(e)}")
+            logger.error(f"Error generating car assets: {repr(e)}")
+            raise Exception(f"Failed to generate car assets: {str(e)}")
