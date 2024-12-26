@@ -24,8 +24,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el resto del código
 COPY . .
 
+# Script de inicio para verificar variables de entorno
+COPY start.sh .
+RUN chmod +x start.sh
+
 # Exponer el puerto
 EXPOSE $PORT
 
-# Comando para ejecutar la aplicación
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Usar el script de inicio
+CMD ["./start.sh"] 
