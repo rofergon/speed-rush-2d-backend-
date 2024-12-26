@@ -9,6 +9,8 @@ import random
 from ..models.car_model import CarPart, PartType, CarConfig
 import logging
 import glob
+import asyncio
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +27,158 @@ class ImageGenerationService:
             self.rembg_session = None
         
         # Obtener todas las imágenes de referencia
-        self.base_images_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
-        self.base_images = [f for f in glob.glob(os.path.join(self.base_images_dir, "*.png")) 
-                          if os.path.basename(f).startswith("car")]
-        if not self.base_images:
-            raise Exception("No se encontraron imágenes de referencia en assets/")
-        logger.info(f"Imágenes de referencia encontradas: {len(self.base_images)}")
+        self.base_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
+        
+        # Cargar imágenes de referencia por tipo
+        self.reference_images = {
+            'car': self._load_references('*.png'),
+            'motor': self._load_references('motor/*.webp'),
+            'transmission': self._load_references('transmission/*.webp'),
+            'wheels': self._load_references('wheels/*.webp')
+        }
+        
+        logger.info(f"Imágenes de referencia encontradas:")
+        for key, images in self.reference_images.items():
+            logger.info(f"- {key}: {len(images)} imágenes")
 
-    def _get_random_base_image(self) -> str:
-        """Selecciona una imagen de referencia aleatoria."""
-        selected_image = random.choice(self.base_images)
-        logger.info(f"Usando imagen de referencia: {os.path.basename(selected_image)}")
-        return selected_image
+    def _load_references(self, pattern: str) -> List[str]:
+        """Cargar imágenes de referencia según un patrón."""
+        path = os.path.join(self.base_dir, pattern)
+        images = glob.glob(path)
+        if not images:
+            logger.warning(f"No se encontraron imágenes para el patrón: {pattern}")
+        return images
+
+    def _get_random_reference(self, part_type: str) -> str:
+        """Obtener una imagen de referencia aleatoria según el tipo."""
+        images = self.reference_images.get(part_type, [])
+        if not images:
+            logger.warning(f"No hay imágenes de referencia para {part_type}, usando imágenes de carro")
+            images = self.reference_images['car']
+        
+        selected = random.choice(images)
+        logger.info(f"Usando imagen de referencia para {part_type}: {os.path.basename(selected)}")
+        return selected
+
+    async def _generate_and_upload(self, 
+        part_type: str, 
+        prompt: str, 
+        reference_type: str
+    ) -> Tuple[bytes, str]:
+        """Generar y subir una imagen."""
+        try:
+            # Generar imagen
+            image_bytes = await self.stability_service.generate_car_variation(
+                self._get_random_reference(reference_type),
+                prompt
+            )
+            
+            # Remover fondo
+            img = Image.open(BytesIO(image_bytes))
+            if self.rembg_session is None:
+                self.rembg_session = new_session()
+            output = remove(img, session=self.rembg_session)
+            
+            # Convertir a bytes
+            img_byte_arr = BytesIO()
+            output.save(img_byte_arr, format='PNG', optimize=True)
+            processed_bytes = img_byte_arr.getvalue()
+            
+            # Subir a Lighthouse
+            uri = await self.lighthouse_service.upload_image(
+                processed_bytes,
+                f"{part_type}.png"
+            )
+            
+            return processed_bytes, uri
+        except Exception as e:
+            logger.error(f"Error generando {part_type}: {str(e)}")
+            raise
+
+    async def generate_car_assets(self, config: CarConfig) -> dict:
+        """Genera todos los assets del carro y sus estadísticas."""
+        try:
+            # Preparar tareas de generación
+            tasks = [
+                # Carro principal
+                self._generate_and_upload(
+                    'car',
+                    config.basePrompt,
+                    'car'
+                ),
+                # Motor
+                self._generate_and_upload(
+                    'engine',
+                    f"detailed {config.engineType} car engine, {config.style} style, white background",
+                    'motor'
+                ),
+                # Transmisión
+                self._generate_and_upload(
+                    'transmission',
+                    f"detailed {config.transmissionType} car transmission, {config.style} style, white background",
+                    'transmission'
+                ),
+                # Ruedas
+                self._generate_and_upload(
+                    'wheels',
+                    f"detailed {config.wheelsType} car wheels, {config.style} style, white background",
+                    'wheels'
+                )
+            ]
+            
+            # Ejecutar todas las generaciones en paralelo
+            logger.info("Iniciando generación paralela de imágenes...")
+            results = await asyncio.gather(*tasks)
+            logger.info("Generación de imágenes completada")
+            
+            # Extraer URIs
+            _, car_uri = results[0]
+            _, engine_uri = results[1]
+            _, transmission_uri = results[2]
+            _, wheels_uri = results[3]
+            
+            # Generar estadísticas
+            parts_data = []
+            
+            # Motor
+            stat1, stat2, stat3 = self._calculate_engine_stats(config)
+            parts_data.append(CarPart(
+                partType=PartType.ENGINE,
+                stat1=stat1,
+                stat2=stat2,
+                stat3=stat3,
+                imageURI=engine_uri
+            ))
+            
+            # Transmisión
+            stat1, stat2, stat3 = self._calculate_transmission_stats(config)
+            parts_data.append(CarPart(
+                partType=PartType.TRANSMISSION,
+                stat1=stat1,
+                stat2=stat2,
+                stat3=stat3,
+                imageURI=transmission_uri
+            ))
+            
+            # Ruedas
+            stat1, stat2, stat3 = self._calculate_wheels_stats(config)
+            parts_data.append(CarPart(
+                partType=PartType.WHEELS,
+                stat1=stat1,
+                stat2=stat2,
+                stat3=stat3,
+                imageURI=wheels_uri
+            ))
+            
+            # Construir respuesta final
+            return {
+                'carImageURI': car_uri,
+                'parts': parts_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating car assets: {repr(e)}")
+            raise Exception(f"Failed to generate car assets: {str(e)}")
 
     def _calculate_engine_stats(self, config: CarConfig) -> tuple[int, int, int]:
         """Calcula las estadísticas del motor."""
@@ -100,81 +242,3 @@ class ImageGenerationService:
                 random.randint(5, 8),   # Manejo
                 random.randint(5, 8)    # Agarre
             )
-
-    async def _generate_part_image(self, part_type: PartType, config: CarConfig) -> bytes:
-        """Genera la imagen para una parte específica del carro."""
-        prompts = {
-            PartType.ENGINE: f"detailed {config.engineType} car engine, {config.style} style, white background",
-            PartType.TRANSMISSION: f"detailed {config.transmissionType} car transmission, {config.style} style, white background",
-            PartType.WHEELS: f"detailed {config.wheelsType} car wheels, {config.style} style, white background"
-        }
-        
-        image_bytes = await self.stability_service.generate_car_variation(
-            self._get_random_base_image(),
-            prompts[part_type]
-        )
-        
-        # Remover fondo
-        img = Image.open(BytesIO(image_bytes))
-        if self.rembg_session is None:
-            self.rembg_session = new_session()
-        output = remove(img, session=self.rembg_session)
-        
-        # Convertir a bytes
-        img_byte_arr = BytesIO()
-        output.save(img_byte_arr, format='PNG', optimize=True)
-        return img_byte_arr.getvalue()
-
-    async def generate_car_assets(self, config: CarConfig) -> dict:
-        """Genera todos los assets del carro y sus estadísticas."""
-        try:
-            # 1. Generar imágenes de las partes
-            images = {}
-            parts_data = []
-            
-            # Generar imagen principal del carro
-            car_image = await self.stability_service.generate_car_variation(
-                self._get_random_base_image(),
-                config.basePrompt
-            )
-            
-            # Subir imagen principal a Lighthouse
-            car_uri = await self.lighthouse_service.upload_image(car_image, "car.png")
-            
-            # Generar y subir imágenes de las partes
-            for part_type in PartType:
-                # Generar imagen de la parte
-                part_image = await self._generate_part_image(part_type, config)
-                
-                # Subir imagen a Lighthouse
-                part_uri = await self.lighthouse_service.upload_image(
-                    part_image,
-                    f"{part_type.name.lower()}.png"
-                )
-                
-                # Calcular estadísticas según el tipo de parte
-                if part_type == PartType.ENGINE:
-                    stat1, stat2, stat3 = self._calculate_engine_stats(config)
-                elif part_type == PartType.TRANSMISSION:
-                    stat1, stat2, stat3 = self._calculate_transmission_stats(config)
-                else:  # WHEELS
-                    stat1, stat2, stat3 = self._calculate_wheels_stats(config)
-                
-                # Agregar datos de la parte
-                parts_data.append(CarPart(
-                    partType=part_type,
-                    stat1=stat1,
-                    stat2=stat2,
-                    stat3=stat3,
-                    imageURI=part_uri
-                ))
-            
-            # Construir respuesta final
-            return {
-                'carImageURI': car_uri,
-                'parts': parts_data
-            }
-            
-        except Exception as e:
-            logger.error(f"Error generating car assets: {repr(e)}")
-            raise Exception(f"Failed to generate car assets: {str(e)}")
