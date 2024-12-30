@@ -296,65 +296,35 @@ class ImageGenerationService:
             logger.error(f"Error generating car assets: {repr(e)}")
             raise Exception(f"Failed to generate car assets: {str(e)}")
 
+    def _generate_weighted_stat(self) -> int:
+        """
+        Genera un número entre 1 y 10 donde 9 y 10 tienen 30% menos probabilidad
+        """
+        numbers = list(range(1, 11))
+        # Los números 1-8 tienen peso 1.0, mientras que 9 y 10 tienen peso 0.7
+        weights = [1.0] * 8 + [0.7] * 2
+        return random.choices(numbers, weights=weights)[0]
+
     def _calculate_engine_stats(self, config: CarConfig) -> tuple[int, int, int]:
-        """Calcula las estadísticas del motor."""
-        if config.engineType == "performance":
-            return (
-                random.randint(7, 10),  # Potencia
-                random.randint(5, 8),   # Eficiencia
-                random.randint(6, 9)    # Durabilidad
-            )
-        elif config.engineType == "eco":
-            return (
-                random.randint(4, 7),   # Potencia
-                random.randint(7, 10),  # Eficiencia
-                random.randint(7, 10)   # Durabilidad
-            )
-        else:  # standard
-            return (
-                random.randint(5, 8),   # Potencia
-                random.randint(5, 8),   # Eficiencia
-                random.randint(5, 8)    # Durabilidad
-            )
+        """Calculate engine statistics based on configuration."""
+        return (
+            self._generate_weighted_stat(),  # Potencia
+            self._generate_weighted_stat(),  # Eficiencia
+            self._generate_weighted_stat()   # Durabilidad
+        )
 
     def _calculate_transmission_stats(self, config: CarConfig) -> tuple[int, int, int]:
-        """Calcula las estadísticas de la transmisión."""
-        if config.transmissionType == "automatic":
-            return (
-                random.randint(6, 9),   # Velocidad de cambio
-                random.randint(7, 10),  # Eficiencia
-                random.randint(5, 8)    # Control
-            )
-        elif config.transmissionType == "manual":
-            return (
-                random.randint(7, 10),  # Velocidad de cambio
-                random.randint(5, 8),   # Eficiencia
-                random.randint(7, 10)   # Control
-            )
-        else:  # sequential
-            return (
-                random.randint(8, 10),  # Velocidad de cambio
-                random.randint(6, 9),   # Eficiencia
-                random.randint(6, 9)    # Control
-            )
+        """Calculate transmission statistics based on configuration."""
+        return (
+            self._generate_weighted_stat(),  # Velocidad de cambio
+            self._generate_weighted_stat(),  # Eficiencia
+            self._generate_weighted_stat()   # Control
+        )
 
     def _calculate_wheels_stats(self, config: CarConfig) -> tuple[int, int, int]:
-        """Calcula las estadísticas de las ruedas."""
-        if config.wheelsType == "racing":
-            return (
-                random.randint(7, 10),  # Tracción
-                random.randint(7, 10),  # Manejo
-                random.randint(6, 9)    # Agarre
-            )
-        elif config.wheelsType == "offroad":
-            return (
-                random.randint(8, 10),  # Tracción
-                random.randint(5, 8),   # Manejo
-                random.randint(7, 10)   # Agarre
-            )
-        else:  # standard
-            return (
-                random.randint(5, 8),   # Tracción
-                random.randint(5, 8),   # Manejo
-                random.randint(5, 8)    # Agarre
-            )
+        """Calculate wheels statistics based on configuration."""
+        return (
+            self._generate_weighted_stat(),  # Tracción
+            self._generate_weighted_stat(),  # Manejo
+            self._generate_weighted_stat()   # Agarre
+        )

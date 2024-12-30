@@ -195,6 +195,19 @@ The system generates images using Stability AI's API with the following characte
 - Consistent color schemes across all components
 - Style-specific prompts for each component type
 
+## 🌐 Statistics Generation System
+
+The system generates statistics for each car component using a weighted random system:
+
+- Statistics range from 1 to 10
+- Numbers 1-8 have normal probability (weight: 1.0)
+- Numbers 9-10 have 30% less probability (weight: 0.7)
+
+This applies to all component statistics:
+- Engine: Power, Efficiency, Durability
+- Transmission: Shift Speed, Efficiency, Control
+- Wheels: Traction, Handling, Grip
+
 ## 🌐 Deployment
 
 The service can be deployed on Railway:
