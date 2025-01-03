@@ -1,0 +1,26 @@
+{
+  "carImageURI": "https://gateway.lighthouse.storage/ipfs/bafkreieqqywnbwy5iplbcdem25jzvzuq6d253nw7ryimhk4dxuasg2ujha",
+  "parts": [
+    {
+      "partType": "ENGINE",
+      "stat1": 2,
+      "stat2": 8,
+      "stat3": 1,
+      "imageURI": "https://gateway.lighthouse.storage/ipfs/bafkreibbchp2cplalvirkmqonp47r6c2iv57sux2zdzqdsaebi4qetvmge"
+    },
+    {
+      "partType": "TRANSMISSION",
+      "stat1": 9,
+      "stat2": 6,
+      "stat3": 5,
+      "imageURI": "https://gateway.lighthouse.storage/ipfs/bafybeigcjomnf3i6j7bwomjfup7sgs3ovpvlh457quw5gl3if7ikxukn2m"
+    },
+    {
+      "partType": "WHEELS",
+      "stat1": 7,
+      "stat2": 9,
+      "stat3": 4,
+      "imageURI": "https://gateway.lighthouse.storage/ipfs/bafybeie7rhcwpbgjyqfp4owbzzxwh7vdw64tltee26nqmuugysppbwh6f4"
+    }
+  ]
+}
