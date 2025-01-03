@@ -7,6 +7,13 @@ from ..models.car_model import CarPart, PartType
 
 logger = logging.getLogger(__name__)
 
+# Mapeo de tipos de parte a valores numéricos
+PART_TYPE_TO_NUMBER = {
+    PartType.ENGINE: 0,
+    PartType.TRANSMISSION: 1,
+    PartType.WHEELS: 2
+}
+
 class CacheService:
     def __init__(self):
         # Obtener la ruta absoluta del directorio raíz del proyecto
@@ -36,7 +43,7 @@ class CacheService:
     def _convert_part_to_dict(self, part: CarPart) -> Dict:
         """Convierte un objeto CarPart a diccionario."""
         return {
-            "partType": str(part.partType),
+            "partType": PART_TYPE_TO_NUMBER[part.partType],
             "stat1": part.stat1,
             "stat2": part.stat2,
             "stat3": part.stat3,
